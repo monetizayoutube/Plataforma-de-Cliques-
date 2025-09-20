@@ -120,11 +120,35 @@ window.addEventListener("DOMContentLoaded", () => {
     { url: "https://ptc.top.app.br/tb.php?id=X08BCAF63", texto: "ptc5" }
   ];
 
-  function solicitarDados() {
+function solicitarDados() {
+  // Se não existir nome, pedir nome
+  if (!nome) {
+    nome = prompt("Informe seu nome:", "");
+    if (nome) localStorage.setItem("nome", nome);
+  }
+
+  // Se não existir email, pedir email
+  if (!email) {
+    email = prompt("Informe seu e-mail do PayPal:", "");
+    if (email) localStorage.setItem("email", email);
+  }
+
+  // Atualiza a exibição
+  atualizarDadosUsuario();
+}
+
+// Chamada inicial: só solicita dados se não estiverem salvos
+if (!nome || !email) {
+  solicitarDados();
+}
+
+
+/*function solicitarDados() {
     if (!nome) { nome = prompt("Informe seu nome:", ""); if (nome) localStorage.setItem("nome", nome); }
     if (!email) { email = prompt("Informe seu e-mail do PayPal:", ""); if (email) localStorage.setItem("email", email); }
     atualizarDadosUsuario();
-  }
+  }*/
+  
   if (!nome || !email) solicitarDados();
 
   function atualizarSaldo() {
