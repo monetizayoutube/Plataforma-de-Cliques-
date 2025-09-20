@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<link rel="manifest" href="/manifest.json"> <script src="/app.js"></script>
 <title>Plataforma de Cliques</title>
 <style>
   body { font-family: Arial, sans-serif; max-width: 500px; margin: 20px auto; text-align: center; }
@@ -34,10 +33,7 @@
 <h2>Plataforma de Cliques</h2>
 
 <div class="ads-area" id="ads">
-  
   <iframe src="https://ad2bitcoin.com/ad.php?ref=Cicerowbd&width=468" marginwidth="0" marginheight="0" width="468" height="60" scrolling="no" border="0" frameborder="0"></iframe>
-  
-  <!--<p><strong>Publicidade:</strong> Aqui pode ir um banner, imagem ou código de anúncio.</p>-->
 </div>
 
 <p><strong>Saldo: R$ <span id="saldo">0.00000</span></strong></p>
@@ -96,6 +92,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   let linksClicadosHoje = JSON.parse(localStorage.getItem("linksClicadosHoje")) || [];
+  let linksDisponiveisAte = JSON.parse(localStorage.getItem("linksDisponiveisAte") || "{}");
 
   const saldoEl = document.getElementById("saldo");
   const saqueBtn = document.getElementById("saqueBtn");
@@ -124,38 +121,10 @@ window.addEventListener("DOMContentLoaded", () => {
   ];
 
   function solicitarDados() {
-  // Se não existir nome, pedir nome
-  if (!nome) {
-    nome = prompt("Informe seu nome:", "");
-    if (nome) localStorage.setItem("nome", nome);
-  }
-
-  // Se não existir email, pedir email
-  if (!email) {
-    email = prompt("Informe seu e-mail do PayPal:", "");
-    if (email) localStorage.setItem("email", email);
-  }
-
-  // Atualiza a exibição
-  atualizarDadosUsuario();
-}
-
-// Chamada inicial: só solicita dados se não estiverem salvos
-if (!nome || !email) {
-  solicitarDados();
-}
-
-
-  /*function solicitarDados() {
-    nome = prompt("Informe seu nome:", nome || "");
-    email = prompt("Informe seu e-mail do PayPal:", email || "");
-    if (nome && email) {
-      localStorage.setItem("nome", nome);
-      localStorage.setItem("email", email);
-    }
+    if (!nome) { nome = prompt("Informe seu nome:", ""); if (nome) localStorage.setItem("nome", nome); }
+    if (!email) { email = prompt("Informe seu e-mail do PayPal:", ""); if (email) localStorage.setItem("email", email); }
     atualizarDadosUsuario();
-  }*/
-  
+  }
   if (!nome || !email) solicitarDados();
 
   function atualizarSaldo() {
@@ -232,8 +201,32 @@ if (!nome || !email) {
       a.target = "_blank";
       a.className = "link";
 
-      if (linksClicadosHoje.includes(indexGlobal)) a.classList.add("clicado");
-      if (indexNaPagina === 0 && !linksClicadosHoje.includes(indexGlobal)) a.classList.add("habilitado");
+      if (linksClicadosHoje.includes(indexGlobal)) {
+        a.classList.add("clicado");
+      } else {
+        const agora = Date.now();
+        const tempoDisponivel = linksDisponiveisAte[indexGlobal] || 0;
+
+        if (agora >= tempoDisponivel) {
+          a.classList.add("habilitado");
+        } else {
+          let contador = Math.ceil((tempoDisponivel - agora) / 1000);
+          a.textContent = `Disponível em ${contador}s`;
+
+          const interval = setInterval(() => {
+            contador--;
+            if (contador > 0) {
+              a.textContent = `Disponível em ${contador}s`;
+            } else {
+              clearInterval(interval);
+              a.textContent = link.texto;
+              a.classList.add("habilitado");
+              delete linksDisponiveisAte[indexGlobal];
+              localStorage.setItem("linksDisponiveisAte", JSON.stringify(linksDisponiveisAte));
+            }
+          }, 1000);
+        }
+      }
 
       a.addEventListener("click", (e) => {
         e.preventDefault();
@@ -254,15 +247,19 @@ if (!nome || !email) {
         linksClicadosHoje.push(indexGlobal);
         localStorage.setItem("linksClicadosHoje", JSON.stringify(linksClicadosHoje));
 
-        // Atualiza contador e botão em tempo real
         atualizarLinksRestantes();
         const aindaExisteLink = linksData.some((_, idx) => !linksClicadosHoje.includes(idx));
         btnUltimaPagina.style.display = aindaExisteLink ? "block" : "none";
 
         window.open(link.url, "_blank");
 
+        // desbloqueio do próximo link
         const proximo = linksContainer.querySelectorAll(".link")[indexNaPagina + 1];
         if (proximo && !proximo.classList.contains("clicado")) {
+          const desbloqueio = Date.now() + 5000;
+          linksDisponiveisAte[inicio + indexNaPagina + 1] = desbloqueio;
+          localStorage.setItem("linksDisponiveisAte", JSON.stringify(linksDisponiveisAte));
+
           let contador = 5;
           const originalText = proximo.textContent;
           proximo.textContent = `Disponível em ${contador}s`;
@@ -275,22 +272,13 @@ if (!nome || !email) {
               clearInterval(interval);
               proximo.textContent = originalText;
               proximo.classList.add("habilitado");
+              delete linksDisponiveisAte[inicio + indexNaPagina + 1];
+              localStorage.setItem("linksDisponiveisAte", JSON.stringify(linksDisponiveisAte));
             }
           }, 1000);
         }
 
-        setTimeout(() => { 
-          bloqueio = false;
-
-          const ultimoDaPagina = indexNaPagina === paginaLinks.length - 1;
-          if (ultimoDaPagina && (paginaAtual + 1) * LINKS_POR_PAGINA < linksData.length) {
-            paginaAtual++;
-            localStorage.setItem("paginaAtual", paginaAtual);
-            renderizarLinks();
-          } else if (ultimoDaPagina && (paginaAtual + 1) * LINKS_POR_PAGINA >= linksData.length) {
-            mensagemFim.style.display = "block";
-          }
-        }, 5000);
+        setTimeout(() => { bloqueio = false; }, 500);
       });
 
       linksContainer.appendChild(a);
@@ -300,28 +288,16 @@ if (!nome || !email) {
     btnProximo.disabled = fim >= linksData.length;
     indicadorPagina.textContent = `Página ${paginaAtual + 1} de ${Math.ceil(linksData.length / LINKS_POR_PAGINA)}`;
 
-    // Atualiza contador e botão
-    atualizarLinksRestantes();
-    const existeLinkDisponivel = linksData.some((_, index) => !linksClicadosHoje.includes(index));
-    btnUltimaPagina.style.display = existeLinkDisponivel ? "block" : "none";
-
     localStorage.setItem("paginaAtual", paginaAtual);
+    atualizarLinksRestantes();
   }
 
   btnAnterior.addEventListener("click", () => {
-    if (paginaAtual > 0) {
-      paginaAtual--;
-      localStorage.setItem("paginaAtual", paginaAtual);
-      renderizarLinks();
-    }
+    if (paginaAtual > 0) { paginaAtual--; localStorage.setItem("paginaAtual", paginaAtual); renderizarLinks(); }
   });
 
   btnProximo.addEventListener("click", () => {
-    if ((paginaAtual + 1) * LINKS_POR_PAGINA < linksData.length) {
-      paginaAtual++;
-      localStorage.setItem("paginaAtual", paginaAtual);
-      renderizarLinks();
-    }
+    if ((paginaAtual + 1) * LINKS_POR_PAGINA < linksData.length) { paginaAtual++; localStorage.setItem("paginaAtual", paginaAtual); renderizarLinks(); }
   });
 
   saqueBtn.addEventListener("click", () => {
@@ -333,7 +309,11 @@ if (!nome || !email) {
   });
 
   editarBtn.addEventListener("click", () => {
-    solicitarDados();
+    nome = prompt("Informe seu nome:", nome);
+    email = prompt("Informe seu e-mail do PayPal:", email);
+    localStorage.setItem("nome", nome);
+    localStorage.setItem("email", email);
+    atualizarDadosUsuario();
     alert("Dados atualizados com sucesso!");
   });
 
