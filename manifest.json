@@ -1,0 +1,12 @@
+{
+ "name": "Plataforma de Cliques",
+ "short_name": "Cliques",
+ "start_url": "https://monetizayoutube.github.io/Plataforma-de-Cliques-",
+ "description": "Ganhe dinheiro clicando em links",
+ "display": "standalone",
+ "orientation": "portrait",
+ "theme_color": "#ffff00",
+ "background_color": "#ffffff",
+ "icons": [],
+ "scope": "https://monetizayoutube.github.io/Plataforma-de-Cliques-"
+}
