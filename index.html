@@ -124,6 +124,29 @@ window.addEventListener("DOMContentLoaded", () => {
   ];
 
   function solicitarDados() {
+  // Se não existir nome, pedir nome
+  if (!nome) {
+    nome = prompt("Informe seu nome:", "");
+    if (nome) localStorage.setItem("nome", nome);
+  }
+
+  // Se não existir email, pedir email
+  if (!email) {
+    email = prompt("Informe seu e-mail do PayPal:", "");
+    if (email) localStorage.setItem("email", email);
+  }
+
+  // Atualiza a exibição
+  atualizarDadosUsuario();
+}
+
+// Chamada inicial: só solicita dados se não estiverem salvos
+if (!nome || !email) {
+  solicitarDados();
+}
+
+
+  /*function solicitarDados() {
     nome = prompt("Informe seu nome:", nome || "");
     email = prompt("Informe seu e-mail do PayPal:", email || "");
     if (nome && email) {
@@ -131,7 +154,8 @@ window.addEventListener("DOMContentLoaded", () => {
       localStorage.setItem("email", email);
     }
     atualizarDadosUsuario();
-  }
+  }*/
+  
   if (!nome || !email) solicitarDados();
 
   function atualizarSaldo() {
