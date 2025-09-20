@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Plataforma de Cliques</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 500px; margin: 20px auto; text-align: center; }
+  .link { display: block; margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 10px; text-decoration: none; color: #333; font-weight: bold; transition: background 0.3s, color 0.3s; pointer-events: none; }
+  .link.habilitado { pointer-events: auto; background: #f0f0ff; }
+  .link:hover { background: #dcdcdc; }
+  .link.clicado { background: #ccc; color: #888; pointer-events: none; }
+  #saqueBtn, #editarBtn { display: none; margin-top: 20px; padding: 10px 15px; font-size: 16px; border: none; border-radius: 8px; cursor: pointer; }
+  #saqueBtn { background: green; color: white; }
+  #editarBtn { background: #007bff; color: white; display: inline-block; margin-left: 10px; }
+  .dados-usuario { margin-top: 10px; font-size: 14px; color: #555; background: #f9f9f9; padding: 8px; border-radius: 6px; }
+  .progress-text { font-size: 13px; color: #333; margin-bottom: 5px; }
+  .progress-container { width: 100%; background: #e0e0e0; border-radius: 10px; margin: 10px 0; height: 20px; overflow: hidden; }
+  .progress-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #00c851, #007e33); transition: width 0.3s ease-in-out; }
+  .cliques-info, .faltam-info { margin: 5px 0; font-size: 14px; color: #444; }
+  .faltam-info strong { color: #007e33; }
+  .animacao-valor { position: absolute; font-size: 14px; font-weight: bold; color: #00c851; animation: subir 1s forwards; pointer-events: none; }
+  @keyframes subir { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-30px); } }
+  #mensagemFim { display: none; margin-top: 15px; font-size: 16px; font-weight: bold; color: red; }
+  .ads-area { background: #fff8dc; border: 1px solid #ddd; margin: 15px 0; padding: 10px; border-radius: 10px; font-size: 14px; overflow-x: hidden; }
+  .paginacao { display: flex; justify-content: space-between; margin-top: 10px; align-items: center; }
+  .paginacao button { padding: 8px 12px; border: none; background: #007bff; color: white; border-radius: 6px; cursor: pointer; }
+  .paginacao button:disabled { background: #aaa; cursor: not-allowed; }
+  #btnUltimaPagina { margin-top:10px; padding:8px 12px; border:none; background:#ff9800; color:white; border-radius:6px; cursor:pointer; }
+</style>
+</head>
+<body>
+<h2>Plataforma de Cliques</h2>
+
+<div class="ads-area" id="ads">
+  
+  <iframe src="https://ad2bitcoin.com/ad.php?ref=Cicerowbd&width=468" marginwidth="0" marginheight="0" width="468" height="60" scrolling="no" border="0" frameborder="0"></iframe>
+  
+  <!--<p><strong>Publicidade:</strong> Aqui pode ir um banner, imagem ou código de anúncio.</p>-->
+</div>
+
+<p><strong>Saldo: R$ <span id="saldo">0.00000</span></strong></p>
+<div class="progress-text">Progresso até R$ 10,00</div>
+<div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+<p class="faltam-info">Faltam <strong>R$ <span id="faltam">10.00</span></strong> para liberar o saque.</p>
+<p class="faltam-info">Faltam <strong><span id="linksRestantes">0</span></strong> anúncios para hoje.</p>
+
+<p class="cliques-info">
+  Cliques de Hoje: <span id="cliquesHoje">0</span> | Total Geral: <span id="totalCliques">0</span>
+</p>
+
+<div class="dados-usuario">
+  <p><strong>Nome:</strong> <span id="exibirNome"></span></p>
+  <p><strong>PayPal:</strong> <span id="exibirEmail"></span></p>
+</div>
+
+<div id="links"></div>
+
+<div class="paginacao">
+  <button id="btnAnterior">Anterior</button>
+  <span id="indicadorPagina"></span>
+  <button id="btnProximo">Próximo</button>
+</div>
+
+<button id="btnUltimaPagina">Ir para Última Página com Links Disponíveis</button>
+
+<div>
+  <button id="saqueBtn">Solicitar Saque</button>
+  <button id="editarBtn">Editar Dados</button>
+</div>
+
+<p id="mensagemFim">Sem mais anúncios disponíveis, volte amanhã</p>
+
+<script>
+window.addEventListener("DOMContentLoaded", () => {
+  const VALOR_POR_CLIQUE = 0.00001;
+  const META_SAQUE = 10.0;
+  const LINKS_POR_PAGINA = 3;
+  let bloqueio = false;
+
+  let nome = localStorage.getItem("nome");
+  let email = localStorage.getItem("email");
+  let saldo = parseFloat(localStorage.getItem("saldo")) || 0;
+  let totalCliques = parseInt(localStorage.getItem("totalCliques")) || 0;
+  let cliquesHoje = parseInt(localStorage.getItem("cliquesHoje")) || 0;
+  let paginaAtual = parseInt(localStorage.getItem("paginaAtual")) || 0;
+
+  const hoje = new Date().toLocaleDateString();
+  let ultimoAcesso = localStorage.getItem("ultimoAcesso");
+  if (ultimoAcesso !== hoje) {
+    localStorage.setItem("ultimoAcesso", hoje);
+    localStorage.setItem("linksClicadosHoje", JSON.stringify([]));
+    cliquesHoje = 0;
+    localStorage.setItem("cliquesHoje", cliquesHoje);
+  }
+
+  let linksClicadosHoje = JSON.parse(localStorage.getItem("linksClicadosHoje")) || [];
+
+  const saldoEl = document.getElementById("saldo");
+  const saqueBtn = document.getElementById("saqueBtn");
+  const editarBtn = document.getElementById("editarBtn");
+  const exibirNome = document.getElementById("exibirNome");
+  const exibirEmail = document.getElementById("exibirEmail");
+  const progressBar = document.getElementById("progressBar");
+  const totalCliquesEl = document.getElementById("totalCliques");
+  const cliquesHojeEl = document.getElementById("cliquesHoje");
+  const faltamEl = document.getElementById("faltam");
+  const linksContainer = document.getElementById("links");
+  const mensagemFim = document.getElementById("mensagemFim");
+  const btnAnterior = document.getElementById("btnAnterior");
+  const btnProximo = document.getElementById("btnProximo");
+  const indicadorPagina = document.getElementById("indicadorPagina");
+  const btnUltimaPagina = document.getElementById("btnUltimaPagina");
+  const linksRestantesEl = document.getElementById("linksRestantes");
+
+  const linksData = [
+    { url: "https://otieu.com/4/9895325", texto: "Otieu" },
+    { url: "https://ptc.top.app.br/tb.php?id=X08BCAF63", texto: "ptc1" },
+    { url: "https://ptc.top.app.br/tb.php?id=X08BCAF63", texto: "ptc2" },
+    { url: "https://ptc.top.app.br/tb.php?id=X08BCAF63", texto: "ptc3" },
+    { url: "https://ptc.top.app.br/tb.php?id=X08BCAF63", texto: "ptc4" },
+    { url: "https://ptc.top.app.br/tb.php?id=X08BCAF63", texto: "ptc5" }
+  ];
+
+  function solicitarDados() {
+    nome = prompt("Informe seu nome:", nome || "");
+    email = prompt("Informe seu e-mail do PayPal:", email || "");
+    if (nome && email) {
+      localStorage.setItem("nome", nome);
+      localStorage.setItem("email", email);
+    }
+    atualizarDadosUsuario();
+  }
+  if (!nome || !email) solicitarDados();
+
+  function atualizarSaldo() {
+    saldoEl.textContent = saldo.toFixed(5);
+    localStorage.setItem("saldo", saldo);
+    progressBar.style.width = Math.min((saldo / META_SAQUE) * 100, 100) + "%";
+    saqueBtn.style.display = saldo >= META_SAQUE ? "inline-block" : "none";
+    editarBtn.style.display = "inline-block";
+    faltamEl.textContent = Math.max(META_SAQUE - saldo, 0).toFixed(5);
+  }
+
+  function atualizarCliques() {
+    totalCliquesEl.textContent = totalCliques;
+    cliquesHojeEl.textContent = cliquesHoje;
+    localStorage.setItem("totalCliques", totalCliques);
+    localStorage.setItem("cliquesHoje", cliquesHoje);
+  }
+
+  function atualizarDadosUsuario() {
+    exibirNome.textContent = nome || "Não informado";
+    exibirEmail.textContent = email || "Não informado";
+  }
+
+  function atualizarLinksRestantes() {
+    const restantes = linksData.filter((_, idx) => !linksClicadosHoje.includes(idx)).length;
+    linksRestantesEl.textContent = restantes;
+  }
+
+  function criarAnimacaoValor(x, y) {
+    const span = document.createElement("span");
+    span.className = "animacao-valor";
+    span.textContent = `+R$${VALOR_POR_CLIQUE.toFixed(5)}`;
+    span.style.left = x + "px";
+    span.style.top = y + "px";
+    document.body.appendChild(span);
+    setTimeout(() => document.body.removeChild(span), 1000);
+  }
+
+  function encontrarUltimaPaginaDisponivel() {
+    const ultimoLinkDisponivelIndex = linksData.findIndex((_, index) => !linksClicadosHoje.includes(index));
+    if (ultimoLinkDisponivelIndex === -1) return null;
+    return Math.floor(ultimoLinkDisponivelIndex / LINKS_POR_PAGINA);
+  }
+
+  btnUltimaPagina.addEventListener("click", () => {
+    const ultimaPagina = encontrarUltimaPaginaDisponivel();
+    if (ultimaPagina !== null) {
+      paginaAtual = ultimaPagina;
+      localStorage.setItem("paginaAtual", paginaAtual);
+      renderizarLinks();
+    }
+  });
+
+  function renderizarLinks() {
+    linksContainer.innerHTML = "";
+    const inicio = paginaAtual * LINKS_POR_PAGINA;
+    const fim = inicio + LINKS_POR_PAGINA;
+    const paginaLinks = linksData.slice(inicio, fim);
+
+    if (paginaLinks.length === 0) {
+      mensagemFim.style.display = "block";
+      indicadorPagina.textContent = "";
+      btnUltimaPagina.style.display = "none";
+      return;
+    }
+
+    mensagemFim.style.display = "none";
+
+    paginaLinks.forEach((link, indexNaPagina) => {
+      const indexGlobal = inicio + indexNaPagina;
+      const a = document.createElement("a");
+      a.href = link.url;
+      a.textContent = link.texto;
+      a.target = "_blank";
+      a.className = "link";
+
+      if (linksClicadosHoje.includes(indexGlobal)) a.classList.add("clicado");
+      if (indexNaPagina === 0 && !linksClicadosHoje.includes(indexGlobal)) a.classList.add("habilitado");
+
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (!a.classList.contains("habilitado") || bloqueio) return;
+        bloqueio = true;
+
+        const rect = a.getBoundingClientRect();
+        criarAnimacaoValor(rect.left + rect.width / 2, rect.top);
+
+        saldo += VALOR_POR_CLIQUE;
+        totalCliques++;
+        cliquesHoje++;
+        atualizarSaldo();
+        atualizarCliques();
+
+        a.classList.add("clicado");
+        a.classList.remove("habilitado");
+        linksClicadosHoje.push(indexGlobal);
+        localStorage.setItem("linksClicadosHoje", JSON.stringify(linksClicadosHoje));
+
+        // Atualiza contador e botão em tempo real
+        atualizarLinksRestantes();
+        const aindaExisteLink = linksData.some((_, idx) => !linksClicadosHoje.includes(idx));
+        btnUltimaPagina.style.display = aindaExisteLink ? "block" : "none";
+
+        window.open(link.url, "_blank");
+
+        const proximo = linksContainer.querySelectorAll(".link")[indexNaPagina + 1];
+        if (proximo && !proximo.classList.contains("clicado")) {
+          let contador = 5;
+          const originalText = proximo.textContent;
+          proximo.textContent = `Disponível em ${contador}s`;
+
+          const interval = setInterval(() => {
+            contador--;
+            if (contador > 0) {
+              proximo.textContent = `Disponível em ${contador}s`;
+            } else {
+              clearInterval(interval);
+              proximo.textContent = originalText;
+              proximo.classList.add("habilitado");
+            }
+          }, 1000);
+        }
+
+        setTimeout(() => { 
+          bloqueio = false;
+
+          const ultimoDaPagina = indexNaPagina === paginaLinks.length - 1;
+          if (ultimoDaPagina && (paginaAtual + 1) * LINKS_POR_PAGINA < linksData.length) {
+            paginaAtual++;
+            localStorage.setItem("paginaAtual", paginaAtual);
+            renderizarLinks();
+          } else if (ultimoDaPagina && (paginaAtual + 1) * LINKS_POR_PAGINA >= linksData.length) {
+            mensagemFim.style.display = "block";
+          }
+        }, 5000);
+      });
+
+      linksContainer.appendChild(a);
+    });
+
+    btnAnterior.disabled = paginaAtual === 0;
+    btnProximo.disabled = fim >= linksData.length;
+    indicadorPagina.textContent = `Página ${paginaAtual + 1} de ${Math.ceil(linksData.length / LINKS_POR_PAGINA)}`;
+
+    // Atualiza contador e botão
+    atualizarLinksRestantes();
+    const existeLinkDisponivel = linksData.some((_, index) => !linksClicadosHoje.includes(index));
+    btnUltimaPagina.style.display = existeLinkDisponivel ? "block" : "none";
+
+    localStorage.setItem("paginaAtual", paginaAtual);
+  }
+
+  btnAnterior.addEventListener("click", () => {
+    if (paginaAtual > 0) {
+      paginaAtual--;
+      localStorage.setItem("paginaAtual", paginaAtual);
+      renderizarLinks();
+    }
+  });
+
+  btnProximo.addEventListener("click", () => {
+    if ((paginaAtual + 1) * LINKS_POR_PAGINA < linksData.length) {
+      paginaAtual++;
+      localStorage.setItem("paginaAtual", paginaAtual);
+      renderizarLinks();
+    }
+  });
+
+  saqueBtn.addEventListener("click", () => {
+    const url = `https://form.jotform.com/252594290046055?nome=${encodeURIComponent(nome)}&email=${encodeURIComponent(email)}&valor=${saldo.toFixed(5)}`;
+    window.open(url, "_blank");
+    saldo = 0;
+    atualizarSaldo();
+    alert("Saque solicitado! Seu saldo foi zerado.");
+  });
+
+  editarBtn.addEventListener("click", () => {
+    solicitarDados();
+    alert("Dados atualizados com sucesso!");
+  });
+
+  atualizarSaldo();
+  atualizarCliques();
+  atualizarDadosUsuario();
+  atualizarLinksRestantes();
+  renderizarLinks();
+});
+</script>
+</body>
+</html>
